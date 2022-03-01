@@ -3,7 +3,13 @@ Proposal for SemEval 2022 Task 8: Similarity assessment of multilingual news art
 
 ## Database setup with Docker
 
-Unzip *Database build/frequency_dump.zip* and *Database build/embeddings_dump.zip* and run in directory *Database build*
+Download and unzip the files
+* frequency_dump.zip
+* embeddings_dump.zip
+
+from <a href='https://drive.google.com/drive/folders/1IlIASnn1qvijD28DdDMmvdkoV5xrfNrM?usp=sharing'>here</a>.
+
+Run in the directory harboring these files :
 
 ```console
 $ docker run --name <your container name> -e POSTGRES_PASSWORD=root -p 5432:5432 -d postgres
