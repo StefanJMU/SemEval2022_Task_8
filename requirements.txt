@@ -2,3 +2,4 @@ numpy
 nltk
 psycopg2
 scipy
+sentence-transformers
