@@ -1,5 +1,6 @@
 import numpy as np
 import scipy as scp
+import warnings
 from nltk.tokenize import sent_tokenize
 
 from mover._preprocessing import Preprocessor
@@ -54,36 +55,36 @@ def _wmd(embedding_1, embedding_2, word_freq_1, word_freq_2, constraint_matrix=N
     # Normalize the word frequencies with respect to the L1 norm
     #
     
-    word_freq_1 = word_freq_1 / np.linalg.norm(word_freq_1,1)
-    word_freq_2 = word_freq_2 / np.linalg.norm(word_freq_2,1)
+    word_freq_1 = word_freq_1 / np.linalg.norm(word_freq_1, 1)
+    word_freq_2 = word_freq_2 / np.linalg.norm(word_freq_2, 1)
     
 
     #
     # Construction of the LP components
     #
     
-    objective_coefficients = 1 - np.matmul(embedding_1,np.transpose(embedding_2,axes=(1,0))).reshape((-1,))
+    objective_coefficients = 1 - np.matmul(embedding_1, np.transpose(embedding_2, axes=(1, 0))).reshape((-1,))
 
-    if constraint_matrix is None :
-        constraint_matrix = constraint_matrix_generator(embedding_1.shape[0],embedding_2.shape[0])
+    if constraint_matrix is None:
+        constraint_matrix = constraint_matrix_generator(embedding_1.shape[0], embedding_2.shape[0])
     
-    equality_constraints = np.concatenate([word_freq_1,word_freq_2])
+    equality_constraints = np.concatenate([word_freq_1, word_freq_2])
     
     #
     # Invoking the scipy LP solver
     #
     
-    try :
-        res = scp.optimize.linprog(objective_coefficients,
-                                        A_ub=None,
-                                        b_ub=None,
-                                        A_eq=constraint_matrix,
-                                        b_eq=equality_constraints
-                                        #bounds=[(0,1)] * objective_coefficients.shape[0]  ->per default non-negative
-                                    )
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            res = scp.optimize.linprog(objective_coefficients,
+                                       A_ub=None,
+                                       b_ub=None,
+                                       A_eq=constraint_matrix,
+                                       b_eq=equality_constraints)
     except Exception as e:
         print(f'Exception occurred in the scipy LP solver. Exception: {e}')
-        return False,0
+        return False, 0
     
     #
     #   Clear up immediately
@@ -93,7 +94,7 @@ def _wmd(embedding_1, embedding_2, word_freq_1, word_freq_2, constraint_matrix=N
     del equality_constraints
     
     # return state of the solver and the minimum objective function value
-    return res.success,res.fun
+    return res.success, res.fun
     
 
 def _sample(sample_distribution, sample_size):
@@ -104,12 +105,12 @@ def _sample(sample_distribution, sample_size):
         
 
 def _monte_carlo_wmd(embedding_1,
-                    embedding_2,
-                    word_freq_1,
-                    word_freq_2,
-                    damping = 0.2,
-                    sims = 5,
-                    sample_size=30):
+                     embedding_2,
+                     word_freq_1,
+                     word_freq_2,
+                     damping=0.2,
+                     sims=5,
+                     sample_size=30):
 
     """
         
@@ -159,11 +160,11 @@ def _monte_carlo_wmd(embedding_1,
             if embedding_2.shape[0] <= sample_size :
                 #   One run is sufficient : no sampling required
                 success, distance = _wmd(embedding_1,
-                                        embedding_2,
-                                        word_freq_1,
-                                        word_freq_2,
-                                        constraint_matrix)
-                return success, distance, 0
+                                         embedding_2,
+                                         word_freq_1,
+                                         word_freq_2,
+                                         constraint_matrix)
+                return success, distance
 
             #   Sample embedding_2
             selection_1 = all_select_1
@@ -179,11 +180,11 @@ def _monte_carlo_wmd(embedding_1,
             else:
                 selection_2 = all_select_2
 
-        success,distance = _wmd( embedding_1[selection_1, :],
-                                embedding_2[selection_2, :],
-                                word_freq_1[selection_1],
-                                word_freq_2[selection_2],
-                                constraint_matrix)
+        success, distance = _wmd(embedding_1[selection_1, :],
+                                 embedding_2[selection_2, :],
+                                 word_freq_1[selection_1],
+                                 word_freq_2[selection_2],
+                                 constraint_matrix)
                                 
         if success:
             wmds.append(distance)
@@ -223,12 +224,12 @@ def wmd(text1: str, text2: str, preprocessor_1: Preprocessor, preprocessor_2: Pr
     embeddings_2, ((words_2, tfidf_2), valid_embeddings_2) = preprocessor_2.process(text2)
 
     success, distance = _monte_carlo_wmd(embeddings_1,
-                                        embeddings_2,
-                                        tfidf_1[valid_embeddings_1],
-                                        tfidf_2[valid_embeddings_2],
-                                        0.2,  # softmax damping for conversion of tf-idf
-                                        10,  # number of monte carlo runs
-                                        40)  # sample size per run
+                                         embeddings_2,
+                                         tfidf_1[valid_embeddings_1],
+                                         tfidf_2[valid_embeddings_2],
+                                         0.2,  # softmax damping for conversion of tf-idf
+                                         10,  # number of monte carlo runs
+                                         40)  # sample size per run
     return success, distance
 
 
@@ -273,12 +274,12 @@ def smd(text1: str, text2: str, model):
     smd_embeddings_2, norm_2 = _embed(sentences_2, model)
 
     success, distance = _monte_carlo_wmd(smd_embeddings_1,
-                                        smd_embeddings_2,
-                                        norm_1,
-                                        norm_2,
-                                        0.2,  # softmax damping for conversion of tf-idf
-                                        10,  # number of monte carlo runs
-                                        40)  # sample size per run
+                                         smd_embeddings_2,
+                                         norm_1,
+                                         norm_2,
+                                         0.2,  # softmax damping for conversion of tf-idf
+                                         10,  # number of monte carlo runs
+                                         40)  # sample size per run
     return success, distance
             
     
